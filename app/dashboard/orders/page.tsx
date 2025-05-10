@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowUpDown, Download, Plus } from "lucide-react"
+import { ArrowUpDown, Download, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -23,6 +23,7 @@ export default function OrdersPage() {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState("")
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
+  const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -117,6 +118,18 @@ export default function OrdersPage() {
     }
   }
 
+  const toggleOrder = (orderId: number) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId)
+      } else {
+        newSet.add(orderId)
+      }
+      return newSet
+    })
+  }
+
   if (isLoading) {
     return <div>Загрузка...</div>
   }
@@ -173,55 +186,80 @@ export default function OrdersPage() {
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead>Товары</TableHead>
                 <TableHead>QR-код</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">#{order.id}</TableCell>
-                  <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell>Склад #{order.warehouse}</TableCell>
-                  <TableCell>{getStatusBadge(order.status)}</TableCell>
-                  <TableCell>
-                    <ul className="list-disc list-inside">
-                      {order.items.map((item, index) => (
-                        <li key={index}>
-                          {item.name} x {item.quantity}
-                        </li>
-                      ))}
-                    </ul>
-                  </TableCell>
-                  <TableCell>
-                    {order.qr_code && (
-                      <img 
-                        src={`http://127.0.0.1:8000${order.qr_code}`} 
-                        alt={`QR-код заказа #${order.id}`}
-                        className="w-16 h-16"
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Link href={`/dashboard/orders/${order.id}`}>
-                        <Button variant="outline" size="sm">
-                          Подробнее
-                        </Button>
-                      </Link>
-                      {order.status === 'new' && (
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => handleCancelClick(order.id)}
-                        >
-                          Отменить
-                        </Button>
+                <>
+                  <TableRow 
+                    key={order.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => toggleOrder(order.id)}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {expandedOrders.has(order.id) ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                        #{order.id}
+                      </div>
+                    </TableCell>
+                    <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>Склад #{order.warehouse}</TableCell>
+                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell>
+                      {order.qr_code && (
+                        <img 
+                          src={`http://127.0.0.1:8000${order.qr_code}`} 
+                          alt={`QR-код заказа #${order.id}`}
+                          className="w-16 h-16"
+                        />
                       )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Link href={`/dashboard/orders/${order.id}`}>
+                          <Button variant="outline" size="sm">
+                            Подробнее
+                          </Button>
+                        </Link>
+                        {order.status === 'new' && (
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCancelClick(order.id)
+                            }}
+                          >
+                            Отменить
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {expandedOrders.has(order.id) && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="bg-muted/30">
+                        <div className="p-4">
+                          <h4 className="font-medium mb-2">Товары в заказе:</h4>
+                          <ul className="space-y-2">
+                            {order.items.map((item, index) => (
+                              <li key={index} className="flex items-center gap-2">
+                                <span>{item.name}</span>
+                                <span className="text-muted-foreground">({item.quantity} шт.)</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               ))}
             </TableBody>
           </Table>
