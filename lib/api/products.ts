@@ -160,23 +160,56 @@ export async function decreaseProductStock(data: StockOperationInput): Promise<{
   return response.json()
 }
 
-export async function transferProductStock(data: StockTransferInput): Promise<{
-  status: string;
-  message: string;
-  from_warehouse_stock: number;
-  to_warehouse_stock: number;
+export async function transferProductStock(
+  productId: number,
+  fromWarehouseId: number,
+  toWarehouseId: number,
+  quantity: number
+): Promise<{
+  status: string
+  message: string
+  from_warehouse_stock?: number
+  to_warehouse_stock?: number
 }> {
-  const response = await fetch(`${API_BASE_URL}/products/products/product_stock_transfer`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) {
-    throw new Error('Ошибка при перемещении товара между складами')
+  try {
+    console.log('Отправка запроса на трансфер:', {
+      productId,
+      fromWarehouseId,
+      toWarehouseId,
+      quantity
+    })
+
+    const url = new URL(`${API_BASE_URL}/products/products/product_stock_transfer`)
+    url.searchParams.append('product_id', productId.toString())
+    url.searchParams.append('from_warehouse_id', fromWarehouseId.toString())
+    url.searchParams.append('to_warehouse_id', toWarehouseId.toString())
+    url.searchParams.append('quantity', quantity.toString())
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+
+    const text = await response.text()
+    console.log('Ответ сервера:', text)
+
+    if (!response.ok) {
+      throw new Error(`Ошибка при перемещении товара: ${text}`)
+    }
+
+    try {
+      const data = JSON.parse(text)
+      return data
+    } catch (e) {
+      console.error('Ошибка парсинга JSON:', text)
+      throw new Error('Неверный формат данных от сервера')
+    }
+  } catch (error) {
+    console.error('Ошибка в transferProductStock:', error)
+    throw error
   }
-  return response.json()
 }
 
 export async function uploadProductImage(data: ProductImageInput, file: File): Promise<ProductImage> {

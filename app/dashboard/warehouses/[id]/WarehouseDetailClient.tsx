@@ -11,6 +11,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getWarehouseById, updateWarehouse, getWarehouseProducts, getProductStock, type Warehouse, type WarehouseProduct } from "@/lib/api/warehouses"
 import { toast } from "sonner"
+import { ArrowUpDown, Download, Plus, Package, Truck, Users, ArrowRightLeft } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Product, getProducts, transferProductStock } from "@/lib/api/products"
+import { Order, getOrders, createOrder as createOrderApi } from "@/lib/api/orders"
+import { API_BASE_URL } from "@/lib/constants"
 
 interface WarehouseDetailClientProps {
   warehouseId: number
@@ -19,106 +27,112 @@ interface WarehouseDetailClientProps {
 export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailClientProps) {
   const router = useRouter()
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null)
-  const [products, setProducts] = useState<WarehouseProduct[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [sortField, setSortField] = useState<keyof Product | null>(null)
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [productsError, setProductsError] = useState<string | null>(null)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [transferQuantity, setTransferQuantity] = useState<number>(1)
+  const [targetWarehouseId, setTargetWarehouseId] = useState<string>("")
+  const [createOrder, setCreateOrder] = useState(false)
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [productStock, setProductStock] = useState<{ [key: number]: number }>({})
+
+  const handleSort = (field: keyof Product) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortDirection("asc")
+    }
+  }
+
+  const sortedProducts = [...products].sort((a, b) => {
+    if (!sortField) return 0
+
+    const aValue = a[sortField]
+    const bValue = b[sortField]
+
+    if (aValue === null || bValue === null) return 0
+
+    if (sortDirection === "asc") {
+      return aValue > bValue ? 1 : -1
+    } else {
+      return aValue < bValue ? 1 : -1
+    }
+  })
+
+  const fetchProducts = async () => {
+    try {
+      const data = await getProducts()
+      setProducts(data)
+      
+      // Получаем информацию о наличии для каждого товара
+      const stockPromises = data.map(product => 
+        getProductStock(product.id, warehouseId)
+          .then(stock => ({ id: product.id, quantity: stock.quantity || 0 }))
+          .catch(() => ({ id: product.id, quantity: 0 }))
+      )
+      const stockResults = await Promise.all(stockPromises)
+      const stockMap = stockResults.reduce((acc, { id, quantity }) => {
+        acc[id] = quantity
+        return acc
+      }, {} as { [key: number]: number })
+      setProductStock(stockMap)
+    } catch (err) {
+      setProductsError("Ошибка при загрузке товаров")
+      console.error(err)
+    }
+  }
 
   useEffect(() => {
-    const fetchWarehouse = async () => {
-      try {
-        if (isNaN(warehouseId)) {
-          setError("Неверный ID склада")
-          return
-        }
-        console.log("Fetching warehouse with ID:", warehouseId)
-        const data = await getWarehouseById(warehouseId)
-        console.log("Received warehouse data:", data)
-        setWarehouse(data)
-      } catch (err) {
-        console.error("Error fetching warehouse:", err)
-        setError("Ошибка при загрузке информации о складе")
-      }
-    }
-
-    const fetchProducts = async () => {
-      try {
-        if (isNaN(warehouseId)) {
-          setProductsError("Неверный ID склада")
-          return
-        }
-        console.log("Fetching products for warehouse:", warehouseId)
-        const data = await getWarehouseProducts(warehouseId)
-        console.log("Received products data:", data)
-        
-        if (!Array.isArray(data)) {
-          console.error("Received data is not an array:", data)
-          setProductsError("Неверный формат данных о товарах")
-          return
-        }
-
-        const productsWithStock = await Promise.all(
-          data.map(async (product) => {
-            try {
-              if (!product.id || !product.name || !product.product_type || typeof product.price !== 'number') {
-                console.error("Invalid product data:", product)
-                return null
-              }
-
-              let stockData
-              try {
-                stockData = await getProductStock(product.id, warehouseId)
-              } catch (err) {
-                console.error("Error fetching stock data for product:", product.id, err)
-                stockData = { quantity: 0 }
-              }
-              
-              return {
-                id: product.id,
-                name: product.name,
-                product_type: product.product_type,
-                product_description: product.product_description || "",
-                price: product.price,
-                warehouses_with_stock: product.warehouses_with_stock || [],
-                quantity: stockData?.quantity ?? 0
-              }
-            } catch (err) {
-              console.error("Error processing product:", product.id, err)
-              return null
-            }
-          })
-        )
-
-        const validatedProducts = productsWithStock.filter((product): product is NonNullable<typeof product> => 
-          product !== null && 
-          typeof product.id === 'number' && 
-          typeof product.name === 'string' &&
-          typeof product.product_type === 'string' &&
-          typeof product.price === 'number' &&
-          typeof product.quantity === 'number'
-        )
-        
-        setProducts(validatedProducts)
-      } catch (err) {
-        console.error("Error fetching products:", err)
-        setProductsError("Ошибка при загрузке товаров")
-      }
-    }
-
     const fetchData = async () => {
-      setIsLoading(true)
-      setError(null)
-      setProductsError(null)
       try {
-        await Promise.all([fetchWarehouse(), fetchProducts()])
+        const data = await getWarehouseById(warehouseId)
+        setWarehouse(data)
+        await fetchProducts()
+      } catch (err) {
+        setError("Ошибка при загрузке данных склада")
+        console.error(err)
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchData()
+  }, [warehouseId])
+
+  useEffect(() => {
+    const fetchWarehouses = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/warehouses/warehouse_list`)
+        if (!response.ok) {
+          throw new Error('Ошибка при получении списка складов')
+        }
+        const text = await response.text()
+        let data
+        try {
+          data = JSON.parse(text)
+        } catch (e) {
+          console.error('Ошибка парсинга JSON:', text)
+          throw new Error('Неверный формат данных от сервера')
+        }
+        if (!Array.isArray(data)) {
+          throw new Error('Полученные данные не являются массивом')
+        }
+        console.log('Полученные склады:', data) // Для отладки
+        setWarehouses(data.filter((w: Warehouse) => w.id !== warehouseId))
+      } catch (err) {
+        console.error("Ошибка при загрузке списка складов:", err)
+        toast.error("Не удалось загрузить список складов")
+      }
+    }
+    fetchWarehouses()
   }, [warehouseId])
 
   const handleSave = async () => {
@@ -137,6 +151,61 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
       console.error(err)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleTransferClick = (product: Product) => {
+    setSelectedProduct(product)
+    setTransferQuantity(1)
+    setTargetWarehouseId("")
+    setCreateOrder(false)
+    setIsTransferDialogOpen(true)
+  }
+
+  const handleTransfer = async () => {
+    if (!selectedProduct || !targetWarehouseId || transferQuantity <= 0) {
+      toast.error("Пожалуйста, заполните все поля корректно")
+      return
+    }
+
+    try {
+      // Сначала выполняем трансфер товара
+      const result = await transferProductStock(
+        selectedProduct.id,
+        warehouseId,
+        parseInt(targetWarehouseId),
+        transferQuantity
+      )
+
+      if (result.status === "success") {
+        // Если выбран чекбокс создания заказа, создаем заказ
+        if (createOrder === true) {
+          try {
+            const orderData = {
+              warehouse_id: parseInt(targetWarehouseId),
+              items: [{
+                product_id: selectedProduct.id,
+                quantity: transferQuantity
+              }]
+            }
+            
+            const order = await createOrderApi(orderData)
+            toast.success(`Заказ #${order.id} успешно создан`)
+          } catch (orderError) {
+            console.error("Ошибка при создании заказа:", orderError)
+            toast.error("Товар перемещен, но не удалось создать заказ")
+          }
+        }
+
+        toast.success(result.message)
+        setIsTransferDialogOpen(false)
+        fetchProducts() // Обновляем список товаров
+      } else {
+        toast.error(result.message)
+      }
+    } catch (error) {
+      console.error("Ошибка при перемещении товара:", error)
+      toast.error("Произошла ошибка при перемещении товара")
     }
   }
 
@@ -220,19 +289,39 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Название</TableHead>
-                  <TableHead>Тип</TableHead>
-                  <TableHead>Цена</TableHead>
+                  <TableHead>
+                    <Button variant="ghost" onClick={() => handleSort("id")}>
+                      ID
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button variant="ghost" onClick={() => handleSort("name")}>
+                      Название
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button variant="ghost" onClick={() => handleSort("product_type")}>
+                      Тип
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button variant="ghost" onClick={() => handleSort("price")}>
+                      Цена
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Описание</TableHead>
                   <TableHead>Количество</TableHead>
-                  <TableHead>Общая стоимость</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
+                {sortedProducts.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell>{product.id}</TableCell>
+                    <TableCell className="font-medium">#{product.id}</TableCell>
                     <TableCell>
                       <Link 
                         href={`/dashboard/products/${product.id}`}
@@ -242,15 +331,27 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                       </Link>
                     </TableCell>
                     <TableCell>{product.product_type}</TableCell>
-                    <TableCell>{product.price.toLocaleString('ru-RU')} ₽</TableCell>
-                    <TableCell>{product.quantity || 0}</TableCell>
-                    <TableCell>{(product.price * (product.quantity || 0)).toLocaleString('ru-RU')} ₽</TableCell>
+                    <TableCell>{product.price} ₽</TableCell>
+                    <TableCell>{product.product_description || "-"}</TableCell>
+                    <TableCell>{productStock[product.id] || 0}</TableCell>
                     <TableCell>
-                      <Link href={`/dashboard/products/${product.id}`}>
-                        <Button variant="outline" size="sm">
-                          Подробнее
-                        </Button>
-                      </Link>
+                      <div className="flex gap-2">
+                        <Link href={`/dashboard/products/${product.id}`}>
+                          <Button variant="outline" size="sm">
+                            Подробнее
+                          </Button>
+                        </Link>
+                        {productStock[product.id] > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTransferClick(product)}
+                          >
+                            <ArrowRightLeft className="h-4 w-4 mr-2" />
+                            Переместить
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -266,6 +367,68 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Перемещение товара</DialogTitle>
+          </DialogHeader>
+          {selectedProduct && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Товар</Label>
+                <div className="text-sm">
+                  {selectedProduct.name} (ID: {selectedProduct.id})
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Количество</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max={productStock[selectedProduct.id] || 0}
+                  value={transferQuantity}
+                  onChange={(e) => setTransferQuantity(parseInt(e.target.value) || 0)}
+                />
+                <div className="text-sm text-muted-foreground">
+                  Доступно: {productStock[selectedProduct.id] || 0} шт.
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Склад назначения</Label>
+                <Select value={targetWarehouseId} onValueChange={setTargetWarehouseId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите склад" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                        #{warehouse.id} "{warehouse.name}"
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="createOrder"
+                  checked={createOrder}
+                  onCheckedChange={(checked) => setCreateOrder(checked as boolean)}
+                />
+                <Label htmlFor="createOrder">Создать заказ на перемещение</Label>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTransferDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleTransfer}>
+              Переместить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 
