@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea"
 import { Order, getOrders, cancelOrder } from "@/lib/api/orders"
 import { toast } from "sonner"
+import React from "react"
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -187,14 +188,14 @@ export default function OrdersPage() {
                   </Button>
                 </TableHead>
                 <TableHead>QR-код</TableHead>
+                <TableHead>Итоговая сумма</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedOrders.map((order) => (
-                <>
+                <React.Fragment key={order.id}>
                   <TableRow 
-                    key={order.id}
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => toggleOrder(order.id)}
                   >
@@ -219,6 +220,9 @@ export default function OrdersPage() {
                           className="w-16 h-16"
                         />
                       )}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString('ru-RU')} ₽
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -249,9 +253,21 @@ export default function OrdersPage() {
                           <h4 className="font-medium mb-2">Товары в заказе:</h4>
                           <ul className="space-y-2">
                             {order.items.map((item, index) => (
-                              <li key={index} className="flex items-center gap-2">
-                                <span>{item.name}</span>
-                                <span className="text-muted-foreground">({item.quantity} шт.)</span>
+                              <li key={`${order.id}-${item.product_id}-${index}`} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Link 
+                                    href={`/dashboard/products/${item.product_id}`}
+                                    className="text-primary hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {item.name}
+                                  </Link>
+                                  <span className="text-muted-foreground">({item.quantity} шт.)</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-muted-foreground">{item.price.toLocaleString('ru-RU')} ₽/шт.</span>
+                                  <span className="font-medium">{(item.price * item.quantity).toLocaleString('ru-RU')} ₽</span>
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -259,7 +275,7 @@ export default function OrdersPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

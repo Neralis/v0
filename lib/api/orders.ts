@@ -2,6 +2,7 @@ export interface OrderItem {
   product_id: number
   name: string
   quantity: number
+  price: number
 }
 
 export interface Order {

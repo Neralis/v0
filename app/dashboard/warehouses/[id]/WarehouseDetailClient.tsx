@@ -60,26 +60,45 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
 
         const productsWithStock = await Promise.all(
           data.map(async (product) => {
-            if (!product.id || !product.name || !product.product_type || !product.price) {
-              console.error("Invalid product data:", product)
-              return null
-            }
+            try {
+              if (!product.id || !product.name || !product.product_type || typeof product.price !== 'number') {
+                console.error("Invalid product data:", product)
+                return null
+              }
 
-            const stockData = await getProductStock(product.id, warehouseId)
-            
-            return {
-              id: product.id,
-              name: product.name,
-              product_type: product.product_type,
-              product_description: product.product_description || "",
-              price: Number(product.price),
-              warehouses_with_stock: product.warehouses_with_stock || [],
-              quantity: stockData.quantity
+              let stockData
+              try {
+                stockData = await getProductStock(product.id, warehouseId)
+              } catch (err) {
+                console.error("Error fetching stock data for product:", product.id, err)
+                stockData = { quantity: 0 }
+              }
+              
+              return {
+                id: product.id,
+                name: product.name,
+                product_type: product.product_type,
+                product_description: product.product_description || "",
+                price: product.price,
+                warehouses_with_stock: product.warehouses_with_stock || [],
+                quantity: stockData?.quantity ?? 0
+              }
+            } catch (err) {
+              console.error("Error processing product:", product.id, err)
+              return null
             }
           })
         )
 
-        const validatedProducts = productsWithStock.filter(Boolean) as WarehouseProduct[]
+        const validatedProducts = productsWithStock.filter((product): product is NonNullable<typeof product> => 
+          product !== null && 
+          typeof product.id === 'number' && 
+          typeof product.name === 'string' &&
+          typeof product.product_type === 'string' &&
+          typeof product.price === 'number' &&
+          typeof product.quantity === 'number'
+        )
+        
         setProducts(validatedProducts)
       } catch (err) {
         console.error("Error fetching products:", err)
