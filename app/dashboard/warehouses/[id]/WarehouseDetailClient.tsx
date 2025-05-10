@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -225,22 +226,37 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                   <TableHead>Цена</TableHead>
                   <TableHead>Количество</TableHead>
                   <TableHead>Общая стоимость</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {products.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>{product.id}</TableCell>
-                    <TableCell>{product.name}</TableCell>
+                    <TableCell>
+                      <Link 
+                        href={`/dashboard/products/${product.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {product.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{product.product_type}</TableCell>
                     <TableCell>{product.price.toLocaleString('ru-RU')} ₽</TableCell>
                     <TableCell>{product.quantity || 0}</TableCell>
                     <TableCell>{(product.price * (product.quantity || 0)).toLocaleString('ru-RU')} ₽</TableCell>
+                    <TableCell>
+                      <Link href={`/dashboard/products/${product.id}`}>
+                        <Button variant="outline" size="sm">
+                          Подробнее
+                        </Button>
+                      </Link>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {products.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center">
+                    <TableCell colSpan={7} className="text-center">
                       На складе нет товаров
                     </TableCell>
                   </TableRow>
