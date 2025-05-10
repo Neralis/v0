@@ -10,8 +10,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Product, getProductById, updateProduct, getProductImages, uploadProductImage } from "@/lib/api/products"
+import { getProductStock, getWarehouseById } from "@/lib/api/warehouses"
 import { toast } from "sonner"
 import Image from "next/image"
+import Link from "next/link"
+
+interface WarehouseStock {
+  warehouseId: number
+  quantity: number
+  name: string
+}
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -25,6 +33,7 @@ export default function ProductDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [images, setImages] = useState<any[]>([])
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStock[]>([])
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -33,6 +42,31 @@ export default function ProductDetailPage() {
         setProduct(data)
         const productImages = await getProductImages(productId)
         setImages(productImages)
+
+        // Получаем информацию о количестве товара на каждом складе
+        const stocks = await Promise.all(
+          data.warehouses_with_stock.map(async (warehouseId) => {
+            try {
+              const [stockData, warehouseData] = await Promise.all([
+                getProductStock(productId, warehouseId),
+                getWarehouseById(warehouseId)
+              ])
+              return {
+                warehouseId,
+                quantity: stockData.quantity,
+                name: warehouseData.name
+              }
+            } catch (err) {
+              console.error(`Error fetching data for warehouse ${warehouseId}:`, err)
+              return {
+                warehouseId,
+                quantity: 0,
+                name: `Склад #${warehouseId}`
+              }
+            }
+          })
+        )
+        setWarehouseStocks(stocks)
       } catch (err) {
         setError("Ошибка при загрузке информации о товаре")
         console.error(err)
@@ -51,9 +85,9 @@ export default function ProductDetailPage() {
     try {
       const updatedProduct = await updateProduct(productId, {
         name: product.name,
-        product_type: product.product_type,
-        price: product.price,
-        product_description: product.product_description,
+        product_type: product.product_type ?? undefined,
+        price: product.price ?? undefined,
+        product_description: product.product_description ?? undefined,
       })
       setProduct(updatedProduct)
       setIsEditing(false)
@@ -220,17 +254,25 @@ export default function ProductDetailPage() {
               <CardTitle>Наличие на складах</CardTitle>
             </CardHeader>
             <CardContent>
-          {product.warehouses_with_stock.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {product.warehouses_with_stock.map((warehouseId) => (
-                <Badge key={warehouseId} variant="outline">
-                  Склад #{warehouseId}
-                </Badge>
-                ))}
-              </div>
-          ) : (
-            <div className="text-muted-foreground">Товар отсутствует на складах</div>
-          )}
+              {product.warehouses_with_stock.length > 0 ? (
+                <div className="space-y-4">
+                  {warehouseStocks.map((stock) => (
+                    <div key={stock.warehouseId} className="flex items-center justify-between p-2 rounded-lg border">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Склад #{stock.warehouseId} "{stock.name}"</Badge>
+                        <span className="text-muted-foreground">Количество: {stock.quantity} шт.</span>
+                      </div>
+                      <Link href={`/dashboard/warehouses/${stock.warehouseId}`}>
+                        <Button variant="outline" size="sm">
+                          Подробнее
+                        </Button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-muted-foreground">Товар отсутствует на складах</div>
+              )}
             </CardContent>
           </Card>
     </div>

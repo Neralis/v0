@@ -11,8 +11,14 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Order, getOrders, cancelOrder } from "@/lib/api/orders"
+import { getWarehouseById } from "@/lib/api/warehouses"
 import { toast } from "sonner"
 import React from "react"
+
+interface WarehouseInfo {
+  id: number
+  name: string
+}
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -25,12 +31,30 @@ export default function OrdersPage() {
   const [cancelReason, setCancelReason] = useState("")
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set())
+  const [warehouseInfo, setWarehouseInfo] = useState<{ [key: number]: WarehouseInfo }>({})
 
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         const data = await getOrders()
         setOrders(data)
+
+        // Получаем информацию о складах
+        const warehousePromises = data.map(async order => {
+          try {
+            const warehouse = await getWarehouseById(order.warehouse)
+            return { id: order.warehouse, name: warehouse.name }
+          } catch (err) {
+            console.error(`Error fetching warehouse ${order.warehouse}:`, err)
+            return { id: order.warehouse, name: `Склад #${order.warehouse}` }
+          }
+        })
+        const warehouseResults = await Promise.all(warehousePromises)
+        const warehouseMap = warehouseResults.reduce((acc, warehouse) => {
+          acc[warehouse.id] = warehouse
+          return acc
+        }, {} as { [key: number]: WarehouseInfo })
+        setWarehouseInfo(warehouseMap)
       } catch (err) {
         setError("Ошибка при загрузке заказов")
         console.error(err)
@@ -210,7 +234,7 @@ export default function OrdersPage() {
                       </div>
                     </TableCell>
                     <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>Склад #{order.warehouse}</TableCell>
+                    <TableCell>#{order.warehouse} "{warehouseInfo[order.warehouse]?.name || `Склад #${order.warehouse}`}"</TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
                     <TableCell>
                       {order.qr_code && (

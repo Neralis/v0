@@ -10,7 +10,13 @@ import { ArrowUpDown, Download, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Product, getProducts, deleteProduct, getProductStock } from "@/lib/api/products"
+import { getWarehouseById } from "@/lib/api/warehouses"
 import { toast } from "sonner"
+
+interface WarehouseInfo {
+  id: number
+  name: string
+}
 
 export default function ProductsPage() {
   const router = useRouter()
@@ -22,12 +28,14 @@ export default function ProductsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [productStock, setProductStock] = useState<{ [key: number]: number }>({})
+  const [warehouseInfo, setWarehouseInfo] = useState<{ [key: number]: WarehouseInfo }>({})
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const data = await getProducts()
         setProducts(data)
+        
         // Получаем информацию о наличии для каждого товара
         const stockPromises = data.map(product => 
           getProductStock(product.id)
@@ -40,6 +48,25 @@ export default function ProductsPage() {
           return acc
         }, {} as { [key: number]: number })
         setProductStock(stockMap)
+
+        // Получаем информацию о складах
+        const warehousePromises = data.flatMap(product => 
+          product.warehouses_with_stock.map(async warehouseId => {
+            try {
+              const warehouse = await getWarehouseById(warehouseId)
+              return { id: warehouseId, name: warehouse.name }
+            } catch (err) {
+              console.error(`Error fetching warehouse ${warehouseId}:`, err)
+              return { id: warehouseId, name: `Склад #${warehouseId}` }
+            }
+          })
+        )
+        const warehouseResults = await Promise.all(warehousePromises)
+        const warehouseMap = warehouseResults.reduce((acc, warehouse) => {
+          acc[warehouse.id] = warehouse
+          return acc
+        }, {} as { [key: number]: WarehouseInfo })
+        setWarehouseInfo(warehouseMap)
       } catch (err) {
         setError("Ошибка при загрузке товаров")
         console.error(err)
@@ -184,7 +211,7 @@ export default function ProductsPage() {
                       <div className="flex flex-wrap gap-1">
                         {product.warehouses_with_stock.map(warehouseId => (
                           <Badge key={warehouseId} variant="outline">
-                            Склад #{warehouseId}
+                            #{warehouseId} "{warehouseInfo[warehouseId]?.name || `Склад #${warehouseId}`}"
                           </Badge>
                         ))}
                       </div>
