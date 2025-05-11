@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getWarehouseById, updateWarehouse, getWarehouseProducts, getProductStock, type Warehouse, type WarehouseProduct } from "@/lib/api/warehouses"
 import { toast } from "sonner"
-import { ArrowUpDown, Download, Plus, Package, Truck, Users, ArrowRightLeft } from "lucide-react"
+import { ArrowUpDown, Download, Plus, Package, Truck, Users, ArrowRightLeft, PieChart } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -19,6 +19,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Product, getProducts, transferProductStock } from "@/lib/api/products"
 import { Order, getOrders, createOrder as createOrderApi } from "@/lib/api/orders"
 import { API_BASE_URL } from "@/lib/constants"
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface WarehouseDetailClientProps {
   warehouseId: number
@@ -215,6 +217,61 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
     }
   }
 
+  // Добавляем расчет данных для диаграммы
+  const getChartData = (type: 'product_type' | 'name') => {
+    const data = sortedProducts
+      .filter(product => (productStock[product.id] || 0) > 0)
+      .reduce((acc, product) => {
+        const key = type === 'product_type' ? product.product_type : product.name
+        const quantity = productStock[product.id] || 0
+        
+        const existingItem = acc.find(item => item.name === key)
+        if (existingItem) {
+          existingItem.value += quantity
+        } else {
+          acc.push({ name: key, value: quantity })
+        }
+        return acc
+      }, [] as { name: string; value: number }[])
+
+    return data
+  }
+
+  const COLORS = [
+    '#0EA5E9', // sky-500
+    '#10B981', // emerald-500
+    '#6366F1', // indigo-500
+    '#8B5CF6', // violet-500
+    '#EC4899', // pink-500
+    '#F59E0B', // amber-500
+    '#14B8A6', // teal-500
+    '#84CC16', // lime-500
+    '#EF4444', // red-500
+    '#A855F7', // purple-500
+  ]
+
+  // Функция для получения цвета с учетом индекса
+  const getColor = (index: number) => {
+    const baseColor = COLORS[index % COLORS.length]
+    const cycle = Math.floor(index / COLORS.length)
+    
+    if (cycle === 0) return baseColor
+
+    // Преобразуем HEX в RGB
+    const r = parseInt(baseColor.slice(1, 3), 16)
+    const g = parseInt(baseColor.slice(3, 5), 16)
+    const b = parseInt(baseColor.slice(5, 7), 16)
+
+    // Уменьшаем яркость для каждого цикла
+    const darkenFactor = 0.85 ** cycle
+    const newR = Math.round(r * darkenFactor)
+    const newG = Math.round(g * darkenFactor)
+    const newB = Math.round(b * darkenFactor)
+
+    // Преобразуем обратно в HEX
+    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`
+  }
+
   if (isLoading) {
     return <div>Загрузка...</div>
   }
@@ -251,7 +308,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
+        <Card className="md:col-span-1">
           <CardHeader>
             <CardTitle>Основная информация</CardTitle>
           </CardHeader>
@@ -285,7 +342,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="md:col-span-1">
           <CardHeader>
             <CardTitle>Финансовая информация</CardTitle>
           </CardHeader>
@@ -304,6 +361,98 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-1">
+          <CardHeader>
+            <CardTitle>Распределение товаров</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="product_type" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="product_type">По типам</TabsTrigger>
+                <TabsTrigger value="name">По товарам</TabsTrigger>
+              </TabsList>
+              <TabsContent value="product_type" className="mt-0">
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={getChartData('product_type')}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {getChartData('product_type').map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getColor(index)} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value) => [`${value} шт.`, 'Количество']}
+                        contentStyle={{ 
+                          backgroundColor: 'white',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px',
+                          padding: '8px'
+                        }}
+                      />
+                      <Legend 
+                        layout="vertical" 
+                        align="right"
+                        verticalAlign="middle"
+                        wrapperStyle={{
+                          paddingLeft: '20px'
+                        }}
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+              </TabsContent>
+              <TabsContent value="name" className="mt-0">
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={getChartData('name')}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {getChartData('name').map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getColor(index)} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value) => [`${value} шт.`, 'Количество']}
+                        contentStyle={{ 
+                          backgroundColor: 'white',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px',
+                          padding: '8px'
+                        }}
+                      />
+                      <Legend 
+                        layout="vertical" 
+                        align="right"
+                        verticalAlign="middle"
+                        wrapperStyle={{
+                          paddingLeft: '20px'
+                        }}
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
