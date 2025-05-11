@@ -43,6 +43,12 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [productStock, setProductStock] = useState<{ [key: number]: number }>({})
 
+  // Добавляем расчет общей стоимости
+  const totalValue = products.reduce((sum, product) => {
+    const quantity = productStock[product.id] || 0
+    return sum + (product.price * quantity)
+  }, 0)
+
   const handleSort = (field: keyof Product) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
@@ -274,6 +280,11 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
             ) : (
               <div className="text-lg">{warehouse.address || "Адрес не указан"}</div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Общая стоимость товаров</Label>
+            <div className="text-lg font-semibold">{totalValue.toLocaleString('ru-RU')} ₽</div>
           </div>
         </CardContent>
       </Card>
