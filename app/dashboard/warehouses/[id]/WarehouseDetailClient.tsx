@@ -250,44 +250,63 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Основная информация</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Название</Label>
-            {isEditing ? (
-              <Input
-                id="name"
-                value={warehouse.name}
-                onChange={(e) => setWarehouse({ ...warehouse, name: e.target.value })}
-              />
-            ) : (
-              <div className="text-lg">{warehouse.name}</div>
-            )}
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Основная информация</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Название</Label>
+              {isEditing ? (
+                <Input
+                  id="name"
+                  value={warehouse.name}
+                  onChange={(e) => setWarehouse({ ...warehouse, name: e.target.value })}
+                />
+              ) : (
+                <div className="text-lg">{warehouse.name}</div>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="address">Адрес</Label>
-            {isEditing ? (
-              <Textarea
-                id="address"
-                value={warehouse.address || ""}
-                onChange={(e) => setWarehouse({ ...warehouse, address: e.target.value })}
-                placeholder="Введите адрес склада"
-              />
-            ) : (
-              <div className="text-lg">{warehouse.address || "Адрес не указан"}</div>
-            )}
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Адрес</Label>
+              {isEditing ? (
+                <Textarea
+                  id="address"
+                  value={warehouse.address || ""}
+                  onChange={(e) => setWarehouse({ ...warehouse, address: e.target.value })}
+                  placeholder="Введите адрес склада"
+                />
+              ) : (
+                <div className="text-lg">{warehouse.address || "Адрес не указан"}</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-2">
-            <Label>Общая стоимость товаров</Label>
-            <div className="text-lg font-semibold">{totalValue.toLocaleString('ru-RU')} ₽</div>
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Финансовая информация</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex flex-col space-y-2">
+                <Label className="text-muted-foreground">Общая стоимость товаров</Label>
+                <div className="text-2xl font-bold text-primary">
+                  {totalValue.toLocaleString('ru-RU')} ₽
+                </div>
+              </div>
+              <div className="flex flex-col space-y-2">
+                <Label className="text-muted-foreground">Количество товаров</Label>
+                <div className="text-lg">
+                  {products.filter(p => (productStock[p.id] || 0) > 0).length} наименований
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>
