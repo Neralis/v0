@@ -300,7 +300,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
               <div className="flex flex-col space-y-2">
                 <Label className="text-muted-foreground">Количество товаров</Label>
                 <div className="text-lg">
-                  {products.filter(p => (productStock[p.id] || 0) > 0).length} наименований
+                  {Object.values(productStock).filter(quantity => quantity > 0).length} наименований
                 </div>
               </div>
             </div>
@@ -349,7 +349,9 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedProducts.map((product) => (
+                {sortedProducts
+                  .filter(product => (productStock[product.id] || 0) > 0)
+                  .map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">#{product.id}</TableCell>
                     <TableCell>
@@ -385,7 +387,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                     </TableCell>
                   </TableRow>
                 ))}
-                {products.length === 0 && (
+                {sortedProducts.filter(product => (productStock[product.id] || 0) > 0).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center">
                       На складе нет товаров
