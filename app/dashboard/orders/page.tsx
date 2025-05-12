@@ -15,6 +15,7 @@ import { getWarehouseById } from "@/lib/api/warehouses"
 import { toast } from "sonner"
 import React from "react"
 import { Label } from "@/components/ui/label"
+import { getOrdersReport } from "@/lib/api/reports"
 
 interface WarehouseInfo {
   id: number
@@ -32,6 +33,7 @@ export default function OrdersPage() {
   const [sortField, setSortField] = useState<keyof Order>("created_at")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set())
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false)
 
   useEffect(() => {
     loadOrders()
@@ -133,14 +135,45 @@ export default function OrdersPage() {
     })
   }
 
+  const handleDownloadReport = async () => {
+    setIsDownloadingReport(true)
+    try {
+      const blob = await getOrdersReport()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `orders_report_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success("Отчет успешно скачан")
+    } catch (error) {
+      console.error("Ошибка при скачивании отчета:", error)
+      toast.error("Произошла ошибка при скачивании отчета")
+    } finally {
+      setIsDownloadingReport(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Заказы</h1>
-        <Button onClick={() => router.push("/dashboard/orders/create")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Создать заказ
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleDownloadReport}
+            disabled={isDownloadingReport}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {isDownloadingReport ? "Скачивание..." : "Скачать отчет"}
+          </Button>
+          <Button onClick={() => router.push("/dashboard/orders/create")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Создать заказ
+          </Button>
+        </div>
       </div>
 
       <Card>

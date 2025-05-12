@@ -23,6 +23,7 @@ import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, T
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { updateProductStock } from "@/lib/api/warehouses"
+import { getStockReport } from "@/lib/api/reports"
 
 interface WarehouseDetailClientProps {
   warehouseId: number
@@ -49,6 +50,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
   const [isEditQuantityDialogOpen, setIsEditQuantityDialogOpen] = useState(false)
   const [editQuantity, setEditQuantity] = useState<number>(0)
   const [isUpdatingQuantity, setIsUpdatingQuantity] = useState(false)
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false)
 
   // Добавляем расчет общей стоимости
   const totalValue = products.reduce((sum, product) => {
@@ -316,6 +318,27 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
     }
   }
 
+  const handleDownloadReport = async () => {
+    setIsDownloadingReport(true)
+    try {
+      const blob = await getStockReport()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `stock_report_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success("Отчет успешно скачан")
+    } catch (error) {
+      console.error("Ошибка при скачивании отчета:", error)
+      toast.error("Произошла ошибка при скачивании отчета")
+    } finally {
+      setIsDownloadingReport(false)
+    }
+  }
+
   if (isLoading) {
     return <div>Загрузка...</div>
   }
@@ -336,7 +359,17 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
         </h1>
         <div className="flex gap-2">
           {!isEditing && (
-            <Button onClick={() => setIsEditing(true)}>Редактировать</Button>
+            <>
+              <Button 
+                variant="outline" 
+                onClick={handleDownloadReport}
+                disabled={isDownloadingReport}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isDownloadingReport ? "Скачивание..." : "Скачать отчет"}
+              </Button>
+              <Button onClick={() => setIsEditing(true)}>Редактировать</Button>
+            </>
           )}
           {isEditing && (
             <>

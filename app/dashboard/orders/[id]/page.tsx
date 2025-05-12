@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 import { Order, getOrderById, updateOrderStatus, cancelOrder } from "@/lib/api/orders"
 import { toast } from "sonner"
+import { getSingleOrderReport } from "@/lib/api/reports"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -26,6 +27,7 @@ export default function OrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState("")
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false)
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -95,6 +97,27 @@ export default function OrderDetailPage() {
     }
   }
 
+  const handleDownloadReport = async () => {
+    setIsDownloadingReport(true)
+    try {
+      const blob = await getSingleOrderReport(orderId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `order_report_${orderId}_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success("Отчет успешно скачан")
+    } catch (error) {
+      console.error("Ошибка при скачивании отчета:", error)
+      toast.error("Произошла ошибка при скачивании отчета")
+    } finally {
+      setIsDownloadingReport(false)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "new":
@@ -142,9 +165,13 @@ export default function OrderDetailPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button variant="outline">
+          <Button 
+            variant="outline" 
+            onClick={handleDownloadReport}
+            disabled={isDownloadingReport}
+          >
             <Download className="mr-2 h-4 w-4" />
-            Скачать отчет
+            {isDownloadingReport ? "Скачивание..." : "Скачать отчет"}
           </Button>
         </div>
       </div>
