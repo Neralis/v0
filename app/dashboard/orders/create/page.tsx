@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,24 +11,31 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Plus, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
+import { toast } from "sonner"
+import { createOrder } from "@/lib/api/orders"
 
-// Моковые данные для клиентов
-const customers = [
-  { id: 1, name: "Иванов Иван", email: "ivanov@example.com", phone: "+7 (999) 123-45-67" },
-  { id: 2, name: "Петров Петр", email: "petrov@example.com", phone: "+7 (999) 234-56-78" },
-  { id: 3, name: "Сидорова Анна", email: "sidorova@example.com", phone: "+7 (999) 345-67-89" },
-  { id: 4, name: "Козлов Дмитрий", email: "kozlov@example.com", phone: "+7 (999) 456-78-90" },
-  { id: 5, name: "Смирнова Елена", email: "smirnova@example.com", phone: "+7 (999) 567-89-01" },
+interface Warehouse {
+  id: number
+  name: string
+}
+
+interface Product {
+  id: number
+  name: string
+  price: number
+}
+
+// Моковые данные для складов
+const warehouses: Warehouse[] = [
+  { id: 1, name: "Основной склад" },
+  { id: 2, name: "Склад №2" },
 ]
 
 // Моковые данные для товаров
-const products = [
-  { id: 1, name: "Смартфон XYZ", price: 15000, type: "Электроника" },
-  { id: 2, name: "Ноутбук ABC", price: 45000, type: "Электроника" },
-  { id: 3, name: "Планшет 123", price: 20000, type: "Электроника" },
-  { id: 4, name: "Наушники QWE", price: 5000, type: "Аксессуары" },
-  { id: 5, name: "Телевизор UHD", price: 35000, type: "Электроника" },
-  { id: 6, name: "Колонка BT", price: 3000, type: "Аксессуары" },
+const products: Product[] = [
+  { id: 1, name: "Товар 1", price: 1000 },
+  { id: 2, name: "Товар 2", price: 2000 },
+  { id: 3, name: "Товар 3", price: 3000 },
 ]
 
 // Статусы заказов
@@ -49,9 +56,9 @@ export default function CreateOrderPage() {
   const [selectedProduct, setSelectedProduct] = useState("")
   const [quantity, setQuantity] = useState("1")
   const [orderData, setOrderData] = useState({
-    customerId: "",
-    status: "В обработке",
-    address: "",
+    warehouse_id: "",
+    client_name: "",
+    destination_address: "",
     comment: "",
   })
 
@@ -81,49 +88,37 @@ export default function CreateOrderPage() {
   }
 
   const handleCreateOrder = async () => {
-    if (!orderData.customerId || orderItems.length === 0) {
-      alert("Пожалуйста, выберите клиента и добавьте товары в заказ")
+    if (!orderData.warehouse_id || !orderData.client_name || !orderData.destination_address || orderItems.length === 0) {
+      alert("Пожалуйста, заполните все обязательные поля и добавьте товары в заказ")
       return
     }
 
     setIsLoading(true)
 
     try {
-      // Подготовка данных для API
       const orderPayload = {
-        customer_id: Number.parseInt(orderData.customerId),
-        status: orderData.status,
-        address: orderData.address,
-        comment: orderData.comment,
+        warehouse_id: Number.parseInt(orderData.warehouse_id),
+        client_name: orderData.client_name,
+        destination_address: orderData.destination_address,
+        comment: orderData.comment || undefined,
         items: orderItems.map((item) => ({
           product_id: item.productId,
           quantity: item.quantity,
-          price: item.price,
         })),
       }
 
-      // В реальном приложении здесь был бы вызов API
-      console.log("Отправка данных на сервер:", orderPayload)
-
-      // Имитация вызова API
-      // const response = await ordersApi.create(orderPayload)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Перенаправление на страницу заказов
+      const response = await createOrder(orderPayload)
+      toast.success("Заказ успешно создан")
       router.push("/dashboard/orders")
     } catch (error) {
       console.error("Ошибка при создании заказа:", error)
-      alert("Произошла ошибка при создании заказа")
+      toast.error("Произошла ошибка при создании заказа")
     } finally {
       setIsLoading(false)
     }
   }
 
   const totalCost = orderItems.reduce((sum, item) => sum + item.quantity * item.price, 0)
-
-  const getCustomerById = (id: string) => {
-    return customers.find((c) => c.id === Number.parseInt(id))
-  }
 
   return (
     <div className="space-y-6">
@@ -236,46 +231,18 @@ export default function CreateOrderPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="customer">Клиент</Label>
+                <Label htmlFor="warehouse">Склад</Label>
                 <Select
-                  value={orderData.customerId}
-                  onValueChange={(value) => setOrderData({ ...orderData, customerId: value })}
+                  value={orderData.warehouse_id}
+                  onValueChange={(value) => setOrderData({ ...orderData, warehouse_id: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Выберите клиента" />
+                    <SelectValue placeholder="Выберите склад" />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id.toString()}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {orderData.customerId && (
-                <div className="pt-2">
-                  <div className="text-sm text-muted-foreground">{getCustomerById(orderData.customerId)?.email}</div>
-                  <div className="text-sm text-muted-foreground">{getCustomerById(orderData.customerId)?.phone}</div>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Статус заказа</Label>
-                <Select
-                  value={orderData.status}
-                  onValueChange={(value) => setOrderData({ ...orderData, status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите статус" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {orderStatuses.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                        {warehouse.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -283,11 +250,21 @@ export default function CreateOrderPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="address">Адрес доставки</Label>
+                <Label htmlFor="client_name">Имя клиента</Label>
+                <Input
+                  id="client_name"
+                  value={orderData.client_name}
+                  onChange={(e) => setOrderData({ ...orderData, client_name: e.target.value })}
+                  placeholder="Введите имя клиента"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="destination_address">Адрес доставки</Label>
                 <Textarea
-                  id="address"
-                  value={orderData.address}
-                  onChange={(e) => setOrderData({ ...orderData, address: e.target.value })}
+                  id="destination_address"
+                  value={orderData.destination_address}
+                  onChange={(e) => setOrderData({ ...orderData, destination_address: e.target.value })}
                   placeholder="Введите адрес доставки"
                 />
               </div>
@@ -308,7 +285,7 @@ export default function CreateOrderPage() {
             className="w-full"
             size="lg"
             onClick={handleCreateOrder}
-            disabled={isLoading || orderItems.length === 0 || !orderData.customerId}
+            disabled={isLoading || orderItems.length === 0 || !orderData.warehouse_id || !orderData.client_name || !orderData.destination_address}
           >
             {isLoading ? "Создание..." : "Создать заказ"}
           </Button>

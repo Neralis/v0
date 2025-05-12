@@ -12,6 +12,10 @@ export interface Order {
   warehouse: number
   qr_code: string | null
   items: OrderItem[]
+  total_price: number
+  client_name: string
+  destination_address: string
+  comment?: string
 }
 
 export interface OrderCreateInput {
@@ -20,11 +24,13 @@ export interface OrderCreateInput {
     product_id: number
     quantity: number
   }[]
+  client_name: string
+  destination_address: string
+  comment?: string
 }
 
 export interface OrderStatusInput {
   status: string
-  reason?: string
 }
 
 export interface ReturnItem {
@@ -35,7 +41,7 @@ export interface ReturnItem {
 
 export interface Return {
   order_id: number
-  reason: string
+  reason?: string
   created_at: string
   items: ReturnItem[]
 }
