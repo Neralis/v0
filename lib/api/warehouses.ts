@@ -110,4 +110,26 @@ export async function getProductStock(productId: number, warehouseId: number): P
     console.error("Error in getProductStock:", error)
     return { quantity: 0 }
   }
+}
+
+export async function updateProductStock(
+  productId: number,
+  warehouseId: number,
+  quantity: number
+): Promise<{ status: string; message: string }> {
+  const response = await fetch(`${API_BASE_URL}/products/product_stock_update`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      product_id: productId,
+      warehouse_id: warehouseId,
+      quantity: quantity
+    }),
+  })
+  if (!response.ok) {
+    throw new Error('Ошибка при обновлении количества товара')
+  }
+  return response.json()
 } 

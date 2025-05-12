@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getWarehouseById, updateWarehouse, getWarehouseProducts, getProductStock, type Warehouse, type WarehouseProduct } from "@/lib/api/warehouses"
 import { toast } from "sonner"
-import { ArrowUpDown, Download, Plus, Package, Truck, Users, ArrowRightLeft, PieChart } from "lucide-react"
+import { ArrowUpDown, Download, Plus, Package, Truck, Users, ArrowRightLeft, PieChart, Pencil } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -22,6 +22,7 @@ import { API_BASE_URL } from "@/lib/constants"
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
+import { updateProductStock } from "@/lib/api/warehouses"
 
 interface WarehouseDetailClientProps {
   warehouseId: number
@@ -45,6 +46,9 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
   const [createOrder, setCreateOrder] = useState(false)
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [productStock, setProductStock] = useState<{ [key: number]: number }>({})
+  const [isEditQuantityDialogOpen, setIsEditQuantityDialogOpen] = useState(false)
+  const [editQuantity, setEditQuantity] = useState<number>(0)
+  const [isUpdatingQuantity, setIsUpdatingQuantity] = useState(false)
 
   // Добавляем расчет общей стоимости
   const totalValue = products.reduce((sum, product) => {
@@ -273,6 +277,45 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
     return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`
   }
 
+  const handleEditQuantityClick = (product: Product) => {
+    setSelectedProduct(product)
+    setEditQuantity(productStock[product.id] || 0)
+    setIsEditQuantityDialogOpen(true)
+  }
+
+  const handleUpdateQuantity = async () => {
+    if (!selectedProduct || editQuantity < 0) {
+      toast.error("Пожалуйста, введите корректное количество")
+      return
+    }
+
+    setIsUpdatingQuantity(true)
+    try {
+      const result = await updateProductStock(
+        selectedProduct.id,
+        warehouseId,
+        editQuantity
+      )
+
+      if (result.status === "success") {
+        toast.success(result.message)
+        setIsEditQuantityDialogOpen(false)
+        // Обновляем локальное состояние
+        setProductStock(prev => ({
+          ...prev,
+          [selectedProduct.id]: editQuantity
+        }))
+      } else {
+        toast.error(result.message)
+      }
+    } catch (error) {
+      console.error("Ошибка при обновлении количества:", error)
+      toast.error("Произошла ошибка при обновлении количества")
+    } finally {
+      setIsUpdatingQuantity(false)
+    }
+  }
+
   if (isLoading) {
     return <div>Загрузка...</div>
   }
@@ -495,7 +538,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                   </TableHead>
                   <TableHead>Описание</TableHead>
                   <TableHead>Количество</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead>Действия</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -515,7 +558,18 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                     <TableCell>{product.product_type}</TableCell>
                     <TableCell>{product.price} ₽</TableCell>
                     <TableCell>{product.product_description || "-"}</TableCell>
-                    <TableCell>{productStock[product.id] || 0}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {productStock[product.id] || 0}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditQuantityClick(product)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Link href={`/dashboard/products/${product.id}`}>
@@ -607,6 +661,41 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
             </Button>
             <Button onClick={handleTransfer}>
               Переместить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditQuantityDialogOpen} onOpenChange={setIsEditQuantityDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактирование количества товара</DialogTitle>
+          </DialogHeader>
+          {selectedProduct && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Товар</Label>
+                <div className="text-sm">
+                  {selectedProduct.name} (ID: {selectedProduct.id})
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Количество</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={editQuantity}
+                  onChange={(e) => setEditQuantity(parseInt(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditQuantityDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleUpdateQuantity} disabled={isUpdatingQuantity}>
+              {isUpdatingQuantity ? "Сохранение..." : "Сохранить"}
             </Button>
           </DialogFooter>
         </DialogContent>
