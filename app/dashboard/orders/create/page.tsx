@@ -13,6 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { createOrder } from "@/lib/api/orders"
+import { getWarehouses } from "@/lib/api/warehouses"
+import { getProducts, type Product as ApiProduct } from "@/lib/api/products"
+import { API_BASE_URL } from "@/lib/constants"
 
 interface Warehouse {
   id: number
@@ -23,23 +26,9 @@ interface Product {
   id: number
   name: string
   price: number
+  product_type: string
+  product_description: string | null
 }
-
-// Моковые данные для складов
-const warehouses: Warehouse[] = [
-  { id: 1, name: "Основной склад" },
-  { id: 2, name: "Склад №2" },
-]
-
-// Моковые данные для товаров
-const products: Product[] = [
-  { id: 1, name: "Товар 1", price: 1000 },
-  { id: 2, name: "Товар 2", price: 2000 },
-  { id: 3, name: "Товар 3", price: 3000 },
-]
-
-// Статусы заказов
-const orderStatuses = ["В обработке", "Подтвержден", "Отправлен", "Доставлен", "Отменен"]
 
 interface OrderItem {
   id: string
@@ -52,15 +41,38 @@ interface OrderItem {
 export default function CreateOrderPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(true)
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [selectedProduct, setSelectedProduct] = useState("")
   const [quantity, setQuantity] = useState("1")
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [products, setProducts] = useState<ApiProduct[]>([])
   const [orderData, setOrderData] = useState({
     warehouse_id: "",
     client_name: "",
     destination_address: "",
     comment: "",
   })
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [warehousesData, productsData] = await Promise.all([
+          getWarehouses(),
+          getProducts()
+        ])
+        setWarehouses(warehousesData)
+        setProducts(productsData)
+      } catch (error) {
+        console.error("Ошибка при загрузке данных:", error)
+        toast.error("Не удалось загрузить данные")
+      } finally {
+        setIsLoadingData(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   const handleAddItem = () => {
     if (selectedProduct && Number.parseInt(quantity) > 0) {
@@ -89,7 +101,7 @@ export default function CreateOrderPage() {
 
   const handleCreateOrder = async () => {
     if (!orderData.warehouse_id || !orderData.client_name || !orderData.destination_address || orderItems.length === 0) {
-      alert("Пожалуйста, заполните все обязательные поля и добавьте товары в заказ")
+      toast.error("Пожалуйста, заполните все обязательные поля и добавьте товары в заказ")
       return
     }
 
@@ -109,7 +121,7 @@ export default function CreateOrderPage() {
 
       const response = await createOrder(orderPayload)
       toast.success("Заказ успешно создан")
-      router.push("/dashboard/orders")
+      router.push(`/dashboard/orders/${response.id}`)
     } catch (error) {
       console.error("Ошибка при создании заказа:", error)
       toast.error("Произошла ошибка при создании заказа")
@@ -119,6 +131,10 @@ export default function CreateOrderPage() {
   }
 
   const totalCost = orderItems.reduce((sum, item) => sum + item.quantity * item.price, 0)
+
+  if (isLoadingData) {
+    return <div>Загрузка данных...</div>
+  }
 
   return (
     <div className="space-y-6">
@@ -261,7 +277,7 @@ export default function CreateOrderPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="destination_address">Адрес доставки</Label>
-                <Textarea
+                <Input
                   id="destination_address"
                   value={orderData.destination_address}
                   onChange={(e) => setOrderData({ ...orderData, destination_address: e.target.value })}
@@ -278,17 +294,16 @@ export default function CreateOrderPage() {
                   placeholder="Введите комментарий к заказу"
                 />
               </div>
+
+              <Button 
+                className="w-full" 
+                onClick={handleCreateOrder}
+                disabled={isLoading}
+              >
+                {isLoading ? "Создание заказа..." : "Создать заказ"}
+              </Button>
             </CardContent>
           </Card>
-
-          <Button
-            className="w-full"
-            size="lg"
-            onClick={handleCreateOrder}
-            disabled={isLoading || orderItems.length === 0 || !orderData.warehouse_id || !orderData.client_name || !orderData.destination_address}
-          >
-            {isLoading ? "Создание..." : "Создать заказ"}
-          </Button>
         </div>
       </div>
     </div>
