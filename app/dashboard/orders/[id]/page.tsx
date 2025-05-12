@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
-import { Order, getOrderById, updateOrderStatus } from "@/lib/api/orders"
+import { Order, getOrderById, updateOrderStatus, cancelOrder } from "@/lib/api/orders"
 import { toast } from "sonner"
 
 export default function OrderDetailPage() {
@@ -78,14 +78,15 @@ export default function OrderDetailPage() {
 
     setIsUpdating(true)
     try {
-      const updatedOrder = await updateOrderStatus(order.id, { 
-        status: "cancelled",
-        reason: cancelReason 
-      })
+      const updatedOrder = await cancelOrder(order.id, cancelReason)
       setOrder(updatedOrder)
       setIsCancelDialogOpen(false)
       setCancelReason("")
       toast.success("Заказ успешно отменен")
+      
+      // Перезагружаем данные заказа
+      const refreshedOrder = await getOrderById(order.id)
+      setOrder(refreshedOrder)
     } catch (error) {
       console.error("Ошибка при отмене заказа:", error)
       toast.error("Произошла ошибка при отмене заказа")
@@ -122,6 +123,7 @@ export default function OrderDetailPage() {
           <h1 className="text-3xl font-bold tracking-tight">Заказ #{order.id}</h1>
           <div className="flex items-center gap-2 text-muted-foreground">
             <span>{new Date(order.created_at).toLocaleDateString()}</span>
+            {getStatusBadge(order.status)}
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -159,6 +161,8 @@ export default function OrderDetailPage() {
                   <TableRow>
                     <TableHead>Название</TableHead>
                     <TableHead>Количество</TableHead>
+                    <TableHead>Цена</TableHead>
+                    <TableHead>Сумма</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -170,8 +174,14 @@ export default function OrderDetailPage() {
                         </Link>
                       </TableCell>
                       <TableCell>{item.quantity}</TableCell>
+                      <TableCell>{item.price.toLocaleString('ru-RU')} ₽</TableCell>
+                      <TableCell>{(item.price * item.quantity).toLocaleString('ru-RU')} ₽</TableCell>
                     </TableRow>
                   ))}
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-right font-medium">Итого:</TableCell>
+                    <TableCell className="font-bold">{order.total_price.toLocaleString('ru-RU')} ₽</TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
@@ -184,10 +194,40 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
+                <div className="font-medium mb-1">Клиент</div>
+                <div className="text-sm text-muted-foreground">{order.client_name}</div>
+              </div>
+              <Separator />
+              <div>
+                <div className="font-medium mb-1">Адрес доставки</div>
+                <div className="text-sm text-muted-foreground">{order.destination_address}</div>
+              </div>
+              <Separator />
+              <div>
                 <div className="font-medium mb-1">Склад</div>
                 <div className="text-sm text-muted-foreground">Склад #{order.warehouse}</div>
               </div>
               <Separator />
+              {order.comment && (
+                <>
+                  <div>
+                    <div className="font-medium mb-1">Комментарий</div>
+                    <div className="text-sm text-muted-foreground">{order.comment}</div>
+                  </div>
+                  <Separator />
+                </>
+              )}
+              {order.status === 'cancelled' && (
+                <>
+                  <div>
+                    <div className="font-medium mb-1 text-red-500">Причина отмены</div>
+                    <div className="text-sm text-red-400">
+                      {order.cancellation_reason || 'Причина не указана'}
+                    </div>
+                  </div>
+                  <Separator />
+                </>
+              )}
               {order.qr_code && (
                 <>
                   <div>
@@ -198,7 +238,6 @@ export default function OrderDetailPage() {
                       className="w-32 h-32"
                     />
                   </div>
-                  <Separator />
                 </>
               )}
             </CardContent>

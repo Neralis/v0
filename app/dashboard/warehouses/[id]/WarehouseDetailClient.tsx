@@ -21,6 +21,7 @@ import { Order, getOrders, createOrder as createOrderApi } from "@/lib/api/order
 import { API_BASE_URL } from "@/lib/constants"
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
 
 interface WarehouseDetailClientProps {
   warehouseId: number

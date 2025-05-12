@@ -16,6 +16,7 @@ export interface Order {
   client_name: string
   destination_address: string
   comment?: string
+  cancellation_reason: string | null
 }
 
 export interface OrderCreateInput {
@@ -31,6 +32,7 @@ export interface OrderCreateInput {
 
 export interface OrderStatusInput {
   status: string
+  reason?: string
 }
 
 export interface ReturnItem {
@@ -101,12 +103,15 @@ export async function updateOrderStatus(id: number, status: OrderStatusInput): P
 }
 
 export async function cancelOrder(id: number, reason: string): Promise<Order> {
-  const response = await fetch(`${API_BASE_URL}/orders/order/${id}/status`, {
+  const response = await fetch(`${API_BASE_URL}/orders/order/${id}/cancel`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ status: 'cancelled', reason }),
+    body: JSON.stringify({ 
+      status: 'cancelled',
+      reason 
+    }),
   })
   if (!response.ok) {
     throw new Error('Ошибка при отмене заказа')
