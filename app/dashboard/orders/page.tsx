@@ -104,7 +104,7 @@ export default function OrdersPage() {
       new: "bg-blue-500",
       processing: "bg-yellow-500",
       shipped: "bg-purple-500",
-      delivered: "bg-green-500",
+      completed: "bg-green-500",
       cancelled: "bg-red-500",
     }
 
@@ -112,7 +112,7 @@ export default function OrdersPage() {
       new: "Новый",
       processing: "В обработке",
       shipped: "Отправлен",
-      delivered: "Доставлен",
+      completed: "Завершен",
       cancelled: "Отменен",
     }
 
