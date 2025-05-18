@@ -47,6 +47,7 @@ export default function CreateOrderPage() {
   const [quantity, setQuantity] = useState("1")
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [products, setProducts] = useState<ApiProduct[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [orderData, setOrderData] = useState({
     warehouse_id: "",
     client_name: "",
@@ -106,6 +107,7 @@ export default function CreateOrderPage() {
     }
 
     setIsLoading(true)
+    setError(null)
 
     try {
       const orderPayload = {
@@ -124,7 +126,9 @@ export default function CreateOrderPage() {
       router.push(`/dashboard/orders/${response.id}`)
     } catch (error) {
       console.error("Ошибка при создании заказа:", error)
-      toast.error("Произошла ошибка при создании заказа")
+      const errorMessage = error instanceof Error ? error.message : "Произошла ошибка при создании заказа"
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -302,6 +306,12 @@ export default function CreateOrderPage() {
               >
                 {isLoading ? "Создание заказа..." : "Создать заказ"}
               </Button>
+
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -83,7 +83,15 @@ export async function createOrder(order: OrderCreateInput): Promise<Order> {
     body: JSON.stringify(order),
   })
   if (!response.ok) {
-    throw new Error('Ошибка при создании заказа')
+    if (response.status === 404) {
+      const errorData = await response.json().catch(() => null)
+      if (errorData?.detail?.includes('No Stock matches')) {
+        throw new Error('Товар не найден на выбранном складе. Пожалуйста, проверьте наличие товара на складе.')
+      }
+      throw new Error('Товар не найден на складе')
+    }
+    const errorData = await response.json().catch(() => null)
+    throw new Error(errorData?.detail || 'Ошибка при создании заказа')
   }
   return response.json()
 }
