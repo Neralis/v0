@@ -15,6 +15,11 @@ import Link from "next/link"
 import { Order, getOrderById, updateOrderStatus, cancelOrder } from "@/lib/api/orders"
 import { toast } from "sonner"
 import { getSingleOrderReport } from "@/lib/api/reports"
+import { getWarehouseById } from "@/lib/api/warehouses"
+import React from "react"
+import { Label } from "@/components/ui/label"
+import { getOrdersReport } from "@/lib/api/reports"
+import { updateProductStock } from "@/lib/api/warehouses"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -63,10 +68,59 @@ export default function OrderDetailPage() {
     try {
       const updatedOrder = await updateOrderStatus(order.id, { status: newStatus })
       setOrder(updatedOrder)
-      toast.success("Статус заказа обновлен")
+
+      // Если статус изменен на "completed", обновляем количество товаров на складе
+      if (newStatus === "completed") {
+        // Проверяем, является ли это заказом о перемещении
+        const isTransferOrder = order.comment?.includes("Заказ создан автоматически при перемещении товара")
+        
+        if (isTransferOrder) {
+          let hasError = false
+          const errors: string[] = []
+
+          // Обновляем количество для каждого товара в заказе
+          for (const item of order.items) {
+            try {
+              const result = await updateProductStock(
+                item.product_id,
+                order.warehouse,
+                item.quantity
+              )
+              if (result.status !== "success") {
+                hasError = true
+                errors.push(`Ошибка для товара ${item.name}: ${result.message}`)
+              }
+            } catch (error) {
+              hasError = true
+              const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка"
+              errors.push(`Ошибка для товара ${item.name}: ${errorMessage}`)
+            }
+          }
+
+          if (hasError) {
+            toast.error(
+              <div>
+                <p>Заказ завершен, но возникли ошибки при обновлении количества товаров:</p>
+                <ul className="list-disc pl-4 mt-2">
+                  {errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          } else {
+            toast.success("Заказ завершен и товары добавлены на склад")
+          }
+        } else {
+          toast.success("Заказ успешно завершен")
+        }
+      } else {
+        toast.success("Статус заказа обновлен")
+      }
     } catch (error) {
       console.error("Ошибка при обновлении статуса:", error)
-      toast.error("Произошла ошибка при обновлении статуса заказа")
+      const errorMessage = error instanceof Error ? error.message : "Произошла ошибка при обновлении статуса заказа"
+      toast.error(errorMessage)
     } finally {
       setIsUpdating(false)
     }

@@ -117,19 +117,60 @@ export async function updateProductStock(
   warehouseId: number,
   quantity: number
 ): Promise<{ status: string; message: string }> {
-  const response = await fetch(`${API_BASE_URL}/products/product_stock_update`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      product_id: productId,
-      warehouse_id: warehouseId,
-      quantity: quantity
-    }),
-  })
-  if (!response.ok) {
+  try {
+    console.log('Отправка запроса на обновление количества товара:', {
+      productId,
+      warehouseId,
+      quantity
+    })
+
+    const response = await fetch(
+      `${API_BASE_URL}/products/products/product_stock_add?product_id=${productId}&warehouse_id=${warehouseId}&quantity=${quantity}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    )
+
+    const text = await response.text()
+    console.log('Ответ сервера:', text)
+
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch (e) {
+      console.error('Ошибка парсинга JSON:', text)
+      throw new Error('Неверный формат данных от сервера')
+    }
+
+    if (!response.ok) {
+      console.error('Ошибка от сервера:', data)
+      
+      // Проверяем различные форматы ошибок
+      if (data && typeof data === 'object') {
+        if (data.detail) {
+          const detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
+          throw new Error(detail)
+        } else if (data.message) {
+          const message = typeof data.message === 'string' ? data.message : JSON.stringify(data.message)
+          throw new Error(message)
+        } else if (Array.isArray(data)) {
+          throw new Error(data.map(item => 
+            typeof item === 'string' ? item : JSON.stringify(item)
+          ).join(', '))
+        }
+      }
+      throw new Error('Ошибка при обновлении количества товара')
+    }
+
+    return data
+  } catch (error) {
+    console.error('Ошибка в updateProductStock:', error)
+    if (error instanceof Error) {
+      throw error
+    }
     throw new Error('Ошибка при обновлении количества товара')
   }
-  return response.json()
 } 
