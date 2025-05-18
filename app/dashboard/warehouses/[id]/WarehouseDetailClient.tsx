@@ -184,6 +184,13 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
     }
 
     try {
+      // Проверяем, что количество не превышает доступное
+      const currentStock = productStock[selectedProduct.id] || 0
+      if (transferQuantity > currentStock) {
+        toast.error(`Недостаточно товара на складе. Доступно: ${currentStock} шт.`)
+        return
+      }
+
       // Сначала выполняем трансфер товара
       const result = await transferProductStock(
         selectedProduct.id,
@@ -196,19 +203,32 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
         // Если выбран чекбокс создания заказа, создаем заказ
         if (createOrder === true) {
           try {
+            // Добавляем небольшую задержку, чтобы дать время на обновление базы данных
+            await new Promise(resolve => setTimeout(resolve, 1000))
+
             const orderData = {
               warehouse_id: parseInt(targetWarehouseId),
               items: [{
                 product_id: selectedProduct.id,
                 quantity: transferQuantity
-              }]
+              }],
+              client_name: "Системный заказ",
+              destination_address: "Перемещение между складами",
+              comment: `Заказ создан автоматически при перемещении товара со склада #${warehouseId}`
             }
             
             const order = await createOrderApi(orderData)
             toast.success(`Заказ #${order.id} успешно создан`)
-          } catch (orderError) {
+          } catch (orderError: any) {
             console.error("Ошибка при создании заказа:", orderError)
-            toast.error("Товар перемещен, но не удалось создать заказ")
+            // Проверяем конкретные ошибки при создании заказа
+            if (orderError.message.includes('не найден на выбранном складе')) {
+              toast.error("Товар перемещен, но не удалось создать заказ: товар не найден на складе назначения")
+            } else if (orderError.message.includes('недостаточно товара')) {
+              toast.error("Товар перемещен, но не удалось создать заказ: недостаточно товара на складе назначения")
+            } else {
+              toast.error(`Товар перемещен, но не удалось создать заказ: ${orderError.message}`)
+            }
           }
         }
 
@@ -216,11 +236,27 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
         setIsTransferDialogOpen(false)
         fetchProducts() // Обновляем список товаров
       } else {
-        toast.error(result.message)
+        // Обработка различных ошибок от API
+        if (result.message.includes('недостаточно товара')) {
+          toast.error(`Недостаточно товара на складе. Доступно: ${currentStock} шт.`)
+        } else if (result.message.includes('не найден')) {
+          toast.error("Товар не найден на складе")
+        } else if (result.message.includes('склад не найден')) {
+          toast.error("Склад назначения не найден")
+        } else {
+          toast.error(result.message || "Произошла ошибка при перемещении товара")
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Ошибка при перемещении товара:", error)
-      toast.error("Произошла ошибка при перемещении товара")
+      // Обработка сетевых ошибок и других исключений
+      if (error.message.includes('Failed to fetch')) {
+        toast.error("Ошибка соединения с сервером")
+      } else if (error.message.includes('JSON')) {
+        toast.error("Ошибка обработки данных от сервера")
+      } else {
+        toast.error(error.message || "Произошла ошибка при перемещении товара")
+      }
     }
   }
 
