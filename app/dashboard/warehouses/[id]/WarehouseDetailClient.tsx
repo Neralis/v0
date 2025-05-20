@@ -51,6 +51,10 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
   const [editQuantity, setEditQuantity] = useState<number>(0)
   const [isUpdatingQuantity, setIsUpdatingQuantity] = useState(false)
   const [isDownloadingReport, setIsDownloadingReport] = useState(false)
+  const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false)
+  const [selectedProductToAdd, setSelectedProductToAdd] = useState<Product | null>(null)
+  const [addQuantity, setAddQuantity] = useState<number>(1)
+  const [isAddingProduct, setIsAddingProduct] = useState(false)
 
   // Добавляем расчет общей стоимости
   const totalValue = products.reduce((sum, product) => {
@@ -375,6 +379,41 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
     }
   }
 
+  const handleAddProduct = async () => {
+    if (!selectedProductToAdd || addQuantity <= 0) {
+      toast.error("Пожалуйста, выберите товар и укажите корректное количество")
+      return
+    }
+
+    setIsAddingProduct(true)
+    try {
+      const result = await updateProductStock(
+        selectedProductToAdd.id,
+        warehouseId,
+        addQuantity
+      )
+
+      if (result.status === "success") {
+        toast.success(result.message)
+        setIsAddProductDialogOpen(false)
+        // Обновляем локальное состояние
+        setProductStock(prev => ({
+          ...prev,
+          [selectedProductToAdd.id]: (prev[selectedProductToAdd.id] || 0) + addQuantity
+        }))
+        // Обновляем список товаров
+        await fetchProducts()
+      } else {
+        toast.error(result.message)
+      }
+    } catch (error) {
+      console.error("Ошибка при добавлении товара:", error)
+      toast.error("Произошла ошибка при добавлении товара")
+    } finally {
+      setIsAddingProduct(false)
+    }
+  }
+
   if (isLoading) {
     return <div>Загрузка...</div>
   }
@@ -571,8 +610,12 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Товары на складе</CardTitle>
+          <Button onClick={() => setIsAddProductDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить товар
+          </Button>
         </CardHeader>
         <CardContent>
           {productsError ? (
@@ -765,6 +808,54 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
             </Button>
             <Button onClick={handleUpdateQuantity} disabled={isUpdatingQuantity}>
               {isUpdatingQuantity ? "Сохранение..." : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Добавить товар на склад</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Товар</Label>
+              <Select
+                value={selectedProductToAdd?.id.toString()}
+                onValueChange={(value) => {
+                  const product = products.find(p => p.id.toString() === value)
+                  setSelectedProductToAdd(product || null)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите товар" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id.toString()}>
+                      {product.name} (ID: {product.id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Количество</Label>
+              <Input
+                type="number"
+                min="1"
+                value={addQuantity}
+                onChange={(e) => setAddQuantity(parseInt(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddProductDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleAddProduct} disabled={isAddingProduct}>
+              {isAddingProduct ? "Добавление..." : "Добавить"}
             </Button>
           </DialogFooter>
         </DialogContent>
