@@ -4,13 +4,14 @@ import type React from "react"
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { LayoutDashboard, Package, ShoppingCart, Warehouse, LogOut, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useMobile } from "@/hooks/use-mobile"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useAuth } from "@/lib/auth-context"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -18,15 +19,9 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const isMobile = useMobile()
   const [open, setOpen] = useState(false)
-
-  const handleLogout = () => {
-    // This would be replaced with your actual logout logic
-    // For demo purposes, we'll just redirect to login
-    router.push("/login")
-  }
+  const { logout } = useAuth()
 
   const navigation = [
     {
@@ -96,7 +91,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <NavItems />
               </nav>
               <div className="mt-auto p-4">
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={handleLogout}>
+                <Button variant="outline" className="w-full justify-start gap-2" onClick={logout}>
                   <LogOut className="h-4 w-4" />
                   Выйти
                 </Button>
@@ -129,7 +124,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="outline" size="sm" className="hidden md:flex gap-2" onClick={handleLogout}>
+          <Button variant="outline" size="sm" className="hidden md:flex gap-2" onClick={logout}>
             <LogOut className="h-4 w-4" />
             Выйти
           </Button>
