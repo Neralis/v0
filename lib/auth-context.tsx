@@ -4,9 +4,17 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { authApi } from "./api-client"
 
+interface User {
+  id: string
+  username: string
+  email?: string
+  full_name: string
+}
+
 interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
+  user: User | null
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -16,6 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -25,10 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      await authApi.me()
+      const userData = await authApi.me()
       setIsAuthenticated(true)
+      setUser(userData)
     } catch (error) {
       setIsAuthenticated(false)
+      setUser(null)
     } finally {
       setIsLoading(false)
     }
@@ -39,8 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authApi.login(username, password);
       
       if (response.success) {
-        setIsAuthenticated(true);
-        window.location.href = "/dashboard/warehouses";
+        const userData = await authApi.me()
+        setIsAuthenticated(true)
+        setUser(userData)
+        window.location.href = "/dashboard";
       } else {
         throw new Error(response.message || 'Login failed');
       }
@@ -54,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await authApi.logout()
       setIsAuthenticated(false)
+      setUser(null)
       // Принудительно очищаем все куки
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
@@ -73,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

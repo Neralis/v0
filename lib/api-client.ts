@@ -194,11 +194,11 @@ export const authApi = {
         throw new Error("Пустой ответ от сервера")
       }
 
-      
       return {
         id: response.id,
         username: response.username,
         email: response.email,
+        full_name: response.full_name || response.username,
         isAuthenticated: response.is_authenticated
       }
     } catch (error) {
