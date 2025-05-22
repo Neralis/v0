@@ -1,16 +1,15 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
+  const router = useRouter()
   const { login } = useAuth()
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -24,8 +23,9 @@ export default function LoginPage() {
 
     try {
       await login(username, password)
+      router.push("/dashboard")
     } catch (err) {
-      setError("Неверное имя пользователя или пароль")
+      setError(err instanceof Error ? err.message : "Ошибка при входе в систему")
     } finally {
       setIsLoading(false)
     }
@@ -39,12 +39,6 @@ export default function LoginPage() {
           <CardDescription>Введите ваши учетные данные для входа в систему</CardDescription>
         </CardHeader>
         <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
           <form onSubmit={handleLogin}>
             <div className="grid gap-4">
               <div className="grid gap-2">
@@ -67,6 +61,11 @@ export default function LoginPage() {
                   required
                 />
               </div>
+              {error && (
+                <div className="text-sm text-red-500">
+                  {error}
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Вход..." : "Войти"}
               </Button>

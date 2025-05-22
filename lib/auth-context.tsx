@@ -1,93 +1,61 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { authApi } from "./api-client"
+import { login as apiLogin, logout as apiLogout, getUserInfo } from "./auth"
 
 interface User {
-  id: string
-  username: string
+  id?: number
+  username?: string
   email?: string
-  full_name: string
+  groups?: string[]
+  is_authenticated: boolean
 }
 
 interface AuthContextType {
-  isAuthenticated: boolean
-  isLoading: boolean
-  user: User | null
+  user: User
+  loading: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  refreshAuth: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<User | null>(null)
-  const router = useRouter()
+  const [user, setUser] = useState<User>({ is_authenticated: false })
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    // Проверяем аутентификацию при загрузке
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
+  const refreshAuth = async () => {
     try {
-      const userData = await authApi.me()
-      setIsAuthenticated(true)
-      setUser(userData)
+      const userInfo = await getUserInfo()
+      setUser(userInfo)
     } catch (error) {
-      setIsAuthenticated(false)
-      setUser(null)
+      setUser({ is_authenticated: false })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   const login = async (username: string, password: string) => {
-    try {
-      const response = await authApi.login(username, password);
-      
-      if (response.success) {
-        const userData = await authApi.me()
-        setIsAuthenticated(true)
-        setUser(userData)
-        window.location.href = "/dashboard";
-      } else {
-        throw new Error(response.message || 'Login failed');
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-      throw error;
+    const result = await apiLogin(username, password)
+    if (result.success) {
+      await refreshAuth()
+    } else {
+      throw new Error(result.message)
     }
   }
 
   const logout = async () => {
-    try {
-      await authApi.logout()
-      setIsAuthenticated(false)
-      setUser(null)
-      // Принудительно очищаем все куки
-      document.cookie.split(";").forEach((c) => {
-        document.cookie = c
-          .replace(/^ +/, "")
-          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
-      })
-      // Перенаправляем на страницу входа
-      router.push("/login")
-      // Принудительно обновляем страницу для очистки состояния
-      window.location.href = "/login"
-    } catch (error) {
-      console.error("Logout error:", error)
-      // Даже если произошла ошибка, все равно перенаправляем на страницу входа
-      router.push("/login")
-      window.location.href = "/login"
-    }
+    await apiLogout()
+    setUser({ is_authenticated: false })
   }
 
+  useEffect(() => {
+    refreshAuth()
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshAuth }}>
       {children}
     </AuthContext.Provider>
   )
