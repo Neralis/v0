@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,17 +9,31 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { createWarehouse } from "@/lib/api/warehouses"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function CreateWarehousePage() {
   const router = useRouter()
+  const { hasRole } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     address: "",
   })
 
+  useEffect(() => {
+    if (!hasRole('admin')) {
+      toast.error("У вас нет прав для создания складов")
+      router.push("/dashboard/warehouses")
+    }
+  }, [hasRole, router])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasRole('admin')) {
+      toast.error("У вас нет прав для создания складов")
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -32,6 +46,10 @@ export default function CreateWarehousePage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (!hasRole('admin')) {
+    return null
   }
 
   return (

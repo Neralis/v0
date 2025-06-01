@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Product, getProducts, deleteProduct, getProductStock } from "@/lib/api/products"
 import { getWarehouseById } from "@/lib/api/warehouses"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/useAuth"
 
 interface WarehouseInfo {
   id: number
@@ -20,6 +21,7 @@ interface WarehouseInfo {
 
 export default function ProductsPage() {
   const router = useRouter()
+  const { hasRole } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [sortField, setSortField] = useState<keyof Product | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
@@ -154,10 +156,12 @@ export default function ProductsPage() {
             <Download className="mr-2 h-4 w-4" />
             Скачать отчет
           </Button>
-          <Button onClick={() => router.push("/dashboard/products/create")}>
-            <Plus className="mr-2 h-4 w-4" />
-            Добавить товар
-          </Button>
+          {hasRole('admin') && (
+            <Button onClick={() => router.push("/dashboard/products/create")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Добавить товар
+            </Button>
+          )}
         </div>
       </div>
 
@@ -226,13 +230,15 @@ export default function ProductsPage() {
                           Подробнее
                         </Button>
                       </Link>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => handleDeleteClick(product)}
-                      >
-                        Удалить
-                      </Button>
+                      {hasRole('admin') && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleDeleteClick(product)}
+                        >
+                          Удалить
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

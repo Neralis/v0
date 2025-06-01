@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { login as apiLogin, logout as apiLogout, getUserInfo } from "./auth"
+import Cookies from 'js-cookie'
+import { useRouter } from 'next/navigation'
 
 interface User {
   id?: number
@@ -19,18 +21,27 @@ interface AuthContextType {
   refreshAuth: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+export const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+const USER_COOKIE_KEY = 'user_data';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>({ is_authenticated: false })
-  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const [user, setUser] = useState<User>(() => {
+    const savedUser = Cookies.get(USER_COOKIE_KEY);
+    return savedUser ? JSON.parse(savedUser) : { is_authenticated: false };
+  })
+  const [loading, setLoading] = useState(!user.is_authenticated)
 
   const refreshAuth = async () => {
     try {
       const userInfo = await getUserInfo()
       setUser(userInfo)
+      // Сохраняем данные в куки
+      Cookies.set(USER_COOKIE_KEY, JSON.stringify(userInfo), { expires: 1 })
     } catch (error) {
       setUser({ is_authenticated: false })
+      Cookies.remove(USER_COOKIE_KEY)
     } finally {
       setLoading(false)
     }
@@ -46,12 +57,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
-    await apiLogout()
-    setUser({ is_authenticated: false })
+    try {
+      await apiLogout()
+      setUser({ is_authenticated: false })
+      Cookies.remove(USER_COOKIE_KEY)
+      // Редирект на страницу входа
+      router.push('/login')
+    } catch (error) {
+      console.error('Error during logout:', error)
+      // Даже если произошла ошибка, очищаем данные пользователя
+      setUser({ is_authenticated: false })
+      Cookies.remove(USER_COOKIE_KEY)
+      // Редирект на страницу входа даже при ошибке
+      router.push('/login')
+    }
   }
 
   useEffect(() => {
-    refreshAuth()
+    if (!user.is_authenticated) {
+      refreshAuth()
+    }
   }, [])
 
   return (
@@ -64,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
 } 

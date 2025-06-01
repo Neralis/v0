@@ -14,6 +14,7 @@ import { getProductStock, getWarehouseById } from "@/lib/api/warehouses"
 import { toast } from "sonner"
 import Image from "next/image"
 import Link from "next/link"
+import { useAuth } from "@/hooks/useAuth"
 
 interface WarehouseStock {
   warehouseId: number
@@ -24,6 +25,7 @@ interface WarehouseStock {
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { hasRole, user } = useAuth()
   const productId = Number(params.id)
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -35,6 +37,13 @@ export default function ProductDetailPage() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStock[]>([])
 
+  // Отдельный эффект для логирования
+  useEffect(() => {
+    console.log('Current user:', user);
+    console.log('Is admin?', hasRole('admin'));
+  }, [user, hasRole]);
+
+  // Основной эффект для загрузки данных
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -76,7 +85,7 @@ export default function ProductDetailPage() {
     }
 
     fetchProduct()
-  }, [productId])
+  }, [productId]) // Зависимость только от productId
 
   const handleSave = async () => {
     if (!product) return
@@ -131,19 +140,21 @@ export default function ProductDetailPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Товар #{product.id}</h1>
         <div className="flex gap-2">
-          {!isEditing ? (
-            <Button variant="outline" onClick={() => setIsEditing(true)}>
-              Редактировать
-        </Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                Отмена
+          {hasRole('admin') && (
+            !isEditing ? (
+              <Button variant="outline" onClick={() => setIsEditing(true)}>
+                Редактировать
               </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? "Сохранение..." : "Сохранить"}
-              </Button>
-            </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  Отмена
+                </Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? "Сохранение..." : "Сохранить"}
+                </Button>
+              </>
+            )
           )}
         </div>
       </div>
@@ -231,20 +242,22 @@ export default function ProductDetailPage() {
 
             <div className="space-y-2">
               <Label>Загрузить новое изображение</Label>
-              <div className="flex gap-2">
-                        <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setSelectedImage(e.target.files?.[0] || null)}
-                />
-                <Button
-                  onClick={handleImageUpload}
-                  disabled={!selectedImage}
-                >
-                  Загрузить
-                </Button>
-              </div>
-              </div>
+              {hasRole('admin') && (
+                <div className="flex gap-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setSelectedImage(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    onClick={handleImageUpload}
+                    disabled={!selectedImage}
+                  >
+                    Загрузить
+                  </Button>
+                </div>
+              )}
+            </div>
             </CardContent>
           </Card>
         </div>

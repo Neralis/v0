@@ -10,9 +10,11 @@ import { ArrowUpDown, Plus } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Warehouse, getWarehouses, deleteWarehouse } from "@/lib/api/warehouses"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function WarehousesPage() {
   const router = useRouter()
+  const { hasRole } = useAuth()
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [sortField, setSortField] = useState<keyof Warehouse | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
@@ -20,6 +22,8 @@ export default function WarehousesPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null)
+
+  const isAdmin = hasRole('admin')
 
   useEffect(() => {
     const fetchWarehouses = async () => {
@@ -62,12 +66,16 @@ export default function WarehousesPage() {
   })
 
   const handleDeleteClick = (warehouse: Warehouse) => {
+    if (!isAdmin) {
+      toast.error("У вас нет прав для удаления складов")
+      return
+    }
     setSelectedWarehouse(warehouse)
     setIsDeleteDialogOpen(true)
   }
 
   const handleDeleteWarehouse = async () => {
-    if (!selectedWarehouse) return
+    if (!selectedWarehouse || !isAdmin) return
 
     try {
       const result = await deleteWarehouse(selectedWarehouse.id)
@@ -98,10 +106,12 @@ export default function WarehousesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Склады</h1>
-        <Button onClick={() => router.push("/dashboard/warehouses/create")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Добавить склад
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => router.push("/dashboard/warehouses/create")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Добавить склад
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -141,13 +151,15 @@ export default function WarehousesPage() {
                           Подробнее
                         </Button>
                       </Link>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => handleDeleteClick(warehouse)}
-                      >
-                        Удалить
-                      </Button>
+                      {isAdmin && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleDeleteClick(warehouse)}
+                        >
+                          Удалить
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

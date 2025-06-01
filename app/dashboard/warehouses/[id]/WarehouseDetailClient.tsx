@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { updateProductStock } from "@/lib/api/warehouses"
 import { getStockReport } from "@/lib/api/reports"
+import { useAuth } from "@/hooks/useAuth"
 
 interface WarehouseDetailClientProps {
   warehouseId: number
@@ -31,6 +32,7 @@ interface WarehouseDetailClientProps {
 
 export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailClientProps) {
   const router = useRouter()
+  const { hasRole } = useAuth()
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [sortField, setSortField] = useState<keyof Product | null>(null)
@@ -55,6 +57,8 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
   const [selectedProductToAdd, setSelectedProductToAdd] = useState<Product | null>(null)
   const [addQuantity, setAddQuantity] = useState<number>(1)
   const [isAddingProduct, setIsAddingProduct] = useState(false)
+
+  const isAdmin = hasRole('admin')
 
   // Добавляем расчет общей стоимости
   const totalValue = products.reduce((sum, product) => {
@@ -155,7 +159,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
   }, [warehouseId])
 
   const handleSave = async () => {
-    if (!warehouse) return
+    if (!warehouse || !isAdmin) return
 
     setIsSaving(true)
     try {
@@ -443,10 +447,12 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
                 <Download className="mr-2 h-4 w-4" />
                 {isDownloadingReport ? "Скачивание..." : "Скачать отчет"}
               </Button>
-              <Button onClick={() => setIsEditing(true)}>Редактировать</Button>
+              {isAdmin && (
+                <Button onClick={() => setIsEditing(true)}>Редактировать</Button>
+              )}
             </>
           )}
-          {isEditing && (
+          {isEditing && isAdmin && (
             <>
               <Button variant="outline" onClick={() => setIsEditing(false)}>
                 Отмена
@@ -467,7 +473,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Название</Label>
-              {isEditing ? (
+              {isEditing && isAdmin ? (
                 <Input
                   id="name"
                   value={warehouse.name}
@@ -480,7 +486,7 @@ export default function WarehouseDetailClient({ warehouseId }: WarehouseDetailCl
 
             <div className="space-y-2">
               <Label htmlFor="address">Адрес</Label>
-              {isEditing ? (
+              {isEditing && isAdmin ? (
                 <Textarea
                   id="address"
                   value={warehouse.address || ""}
